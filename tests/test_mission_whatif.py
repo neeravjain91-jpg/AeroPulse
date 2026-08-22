@@ -29,7 +29,10 @@ def test_high_altitude_changes_what_if_outputs():
     base = engine.run(_telemetry(), MissionScenario("baseline", altitude_ft=3000))
     high = engine.run(_telemetry(), MissionScenario("high-altitude", altitude_ft=25000))
     assert high["telemetry"]["Air_Density_Ratio"] < base["telemetry"]["Air_Density_Ratio"]
-    assert high["engine_rpm"] != base["engine_rpm"]
+    # RPM is an imposed operating input in the current reduced-order model;
+    # altitude therefore changes coupled outputs rather than RPM itself.
+    assert high["fuel_flow"] != base["fuel_flow"]
+    assert high["telemetry"]["MAP_Injector"] != base["telemetry"]["MAP_Injector"]
 
 
 def test_hot_weather_increases_thermal_loading():
