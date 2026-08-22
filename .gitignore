@@ -9,8 +9,13 @@ venv/
 node_modules/
 dist/
 
-# Models / datasets
+# Generated model/data artifacts
 models/*.joblib
+models/metrics.json
+models/model_manifest.json
+models/cmapss_rul_metrics.json
+data_sample/aces_demo.csv
+data_sample/cwru_demo.csv
 FINAL_DATASET/
 data/raw/
 *.zip
