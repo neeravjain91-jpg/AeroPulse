@@ -1,0 +1,24 @@
+from __future__ import annotations
+import math
+from .degradation import estimate_degradation_horizon
+from .risk import mission_risk
+from .simulator import inject_fault, mission_adjust
+
+def _dynamic_step(base:dict,index:int,steps:int)->dict:
+    data=dict(base);phase=2.0*math.pi*index/max(steps,1);data["Engine_RPM"]*=1.0+0.012*math.sin(phase*3.0);data["Fuel_Flow"]*=1.0+0.018*math.sin(phase*2.0+0.4)
+    for key,offset in [("EGT1",0.0),("EGT2",0.8),("EGT3",1.6)]:data[key]*=1.0+0.006*math.sin(phase*2.5+offset)
+    data["Oil_Temp"]*=1.0+0.004*math.sin(phase);data["MAP_Injector"]*=1.0+0.008*math.sin(phase*1.5);return data
+
+def run_replay(ai,base:dict,scenario:dict,steps:int=48,step_minutes:float=5.0,fault_onset_ratio:float=0.35)->dict:
+    steps=max(12,min(int(steps),180));step_minutes=max(0.5,min(float(step_minutes),60.0));onset=max(0.0,min(0.95,float(fault_onset_ratio)));onset_step=int(steps*onset);target_severity=max(0.0,min(1.0,float(scenario.get("severity",0.6))));fault_name=str(scenario.get("fault","none"));timeline=[];ai_warning_step=None;reference_alarm_step=None
+    for i in range(steps):
+        point=_dynamic_step(base,i,steps);point=mission_adjust(point,float(scenario.get("altitude_ft",3000)),float(scenario.get("ambient_c",25)),float(scenario.get("duration_h",4)),bool(scenario.get("rapid_throttle",False)))
+        if fault_name!="none" and i>=onset_step:
+            progress=(i-onset_step+1)/max(1,steps-onset_step);point=inject_fault(point,fault_name,target_severity*progress)
+        analysis=ai.analyze(point,context=scenario);risk=mission_risk(analysis,scenario);anomaly_flag=bool(analysis.get("anomaly_flag",False));health_warning=analysis["health_state"] in {"Warning","Critical"} and float(analysis["twin"]["residual_rms"])>=1.0;reference_alarm=float(analysis["twin"]["max_abs_z"])>=3.0;intelligent_warning=anomaly_flag or health_warning or float(analysis["twin"]["residual_rms"])>=1.0
+        if ai_warning_step is None and intelligent_warning:ai_warning_step=i
+        if reference_alarm_step is None and reference_alarm:reference_alarm_step=i
+        timeline.append({"step":i,"time_min":round(i*step_minutes,2),"health_state":analysis["health_state"],"health_index":analysis["health_index"],"anomaly_score":analysis["anomaly_score"],"residual_rms":round(float(analysis["twin"]["residual_rms"]),3),"max_abs_z":round(float(analysis["twin"]["max_abs_z"]),3),"risk_score":risk["score"],"risk_level":risk["level"],"primary_fault":analysis["fault_candidates"][0]["name"] if analysis["fault_candidates"] else "None","sensor_trust":analysis["sensor_health"]["overall_trust_score"],"telemetry":{k:round(float(v),4) if isinstance(v,(int,float)) else v for k,v in point.items()}})
+    rul=estimate_degradation_horizon([x["health_index"] for x in timeline],step_minutes);early=None
+    if ai_warning_step is not None and reference_alarm_step is not None:early=round((reference_alarm_step-ai_warning_step)*step_minutes,2)
+    return {"timeline":timeline,"summary":{"steps":steps,"step_minutes":step_minutes,"fault_onset_step":onset_step if fault_name!="none" else None,"fault_onset_min":round(onset_step*step_minutes,2) if fault_name!="none" else None,"intelligent_warning_step":ai_warning_step,"intelligent_warning_min":round(ai_warning_step*step_minutes,2) if ai_warning_step is not None else None,"ai_warning_step":ai_warning_step,"ai_warning_min":round(ai_warning_step*step_minutes,2) if ai_warning_step is not None else None,"reference_alarm_step":reference_alarm_step,"reference_alarm_min":round(reference_alarm_step*step_minutes,2) if reference_alarm_step is not None else None,"early_warning_gain_min":early,"comparison_note":"The intelligent warning fuses model/twin evidence; the reference alarm is a 3-sigma single-parameter Digital-Twin baseline. Neither is a certified engine limit.","final_health_index":timeline[-1]["health_index"],"final_health_state":timeline[-1]["health_state"],"peak_risk_score":max(x["risk_score"] for x in timeline),"rul_method_demonstrator":rul}}
