@@ -1,0 +1,8 @@
+.venv
+venv
+__pycache__
+.pytest_cache
+.git
+FINAL_DATASET
+*.zip
+node_modules
