@@ -15,9 +15,7 @@ def _dynamic_step(base:dict,index:int,steps:int)->dict:
 def _replay_rul(health_history:list[float], fallback:dict, step_minutes:float)->dict:
     trend=estimate_degradation_horizon(health_history,step_minutes)
     if trend.get("rul_hours") is not None:
-        confidence=float(trend["confidence"])
-        horizon=float(trend["rul_hours"])
-        spread=0.25*(1.0-confidence)
+        confidence=float(trend["confidence"]);horizon=float(trend["rul_hours"]);spread=0.25*(1.0-confidence)
         return {"rul_hours":round(horizon,2),"rul_lower_hours":max(0.0,round(horizon*(1.0-spread),2)),"rul_upper_hours":round(horizon*(1.0+spread),2),"rul_confidence":round(confidence,2)}
     return fallback
 
@@ -26,7 +24,10 @@ def run_replay(ai,base:dict,scenario:dict,steps:int=48,step_minutes:float=5.0,fa
     for i in range(steps):
         point=_dynamic_step(base,i,steps);point=mission_adjust(point,float(scenario.get("altitude_ft",3000)),float(scenario.get("ambient_c",25)),float(scenario.get("duration_h",4)),bool(scenario.get("rapid_throttle",False)))
         if fault_name!="none" and i>=onset_step:
-            progress=(i-onset_step+1)/max(1,steps-onset_step);point=inject_fault(point,fault_name,target_severity*progress)
+            progress=(i-onset_step+1)/max(1,steps-onset_step);fault_severity=target_severity*progress;point=inject_fault(point,fault_name,fault_severity)
+            # An injected fault is part of the replay degradation trajectory. Keep
+            # the explicit severity available to the RUL demonstrator and UI.
+            point["Degradation_Severity"]=max(float(point.get("Degradation_Severity",0.0)),fault_severity)
         analysis=ai.analyze(point,context=scenario);risk=mission_risk(analysis,scenario);anomaly_flag=bool(analysis.get("anomaly_flag",False));health_warning=analysis["health_state"] in {"Warning","Critical"} and float(analysis["twin"]["residual_rms"])>=1.0;reference_alarm=float(analysis["twin"]["max_abs_z"])>=3.0;intelligent_warning=anomaly_flag or health_warning or float(analysis["twin"]["residual_rms"])>=1.0
         if ai_warning_step is None and intelligent_warning:ai_warning_step=i
         if reference_alarm_step is None and reference_alarm:reference_alarm_step=i
