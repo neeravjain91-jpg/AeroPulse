@@ -1,123 +1,28 @@
+from __future__ import annotations
 from pathlib import Path
-import argparse
-import json
-import joblib
-import pandas as pd
+import argparse,json,platform
+import joblib,numpy as np,pandas as pd,sklearn
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier, IsolationForest
-from sklearn.metrics import classification_report, accuracy_score, balanced_accuracy_score
+from sklearn.ensemble import IsolationForest,RandomForestClassifier
 from sklearn.impute import SimpleImputer
-
-parser = argparse.ArgumentParser(description="Train AeroPulse-X models")
-parser.add_argument("--data-dir", required=True, help="Path to FINAL_DATASET directory")
-args = parser.parse_args()
-
-ROOT = Path(__file__).resolve().parents[1]
-DATA = Path(args.data_dir).expanduser().resolve()
-OUT = ROOT / "models"
-OUT.mkdir(exist_ok=True)
-metrics = {}
-
-# ACES health model: deliberately exclude Robust_Anomaly_Score to avoid target leakage.
-aces_features = [
-    "Engine_RPM", "EGT1", "EGT2", "EGT3", "Fuel_Flow", "Oil_Temp",
-    "Oil_Pressure", "EFI_Fuel_Temp", "EFI_Water_Temp", "MAP_Injector",
-    "Operating_State",
-]
-num = aces_features[:-1]
-cat = ["Operating_State"]
-pre = ColumnTransformer([
-    ("num", Pipeline([("imp", SimpleImputer(strategy="median"))]), num),
-    ("cat", OneHotEncoder(handle_unknown="ignore"), cat),
-])
-rf = RandomForestClassifier(
-    n_estimators=80,
-    max_depth=18,
-    min_samples_leaf=2,
-    class_weight="balanced_subsample",
-    random_state=42,
-    n_jobs=-1,
-)
-health_pipe = Pipeline([("pre", pre), ("model", rf)])
-train = pd.read_csv(DATA / "ACES" / "aces_train.csv")
-val = pd.read_csv(DATA / "ACES" / "aces_val.csv")
-test = pd.read_csv(DATA / "ACES" / "aces_test.csv")
-health_pipe.fit(train[aces_features], train.Health_State)
-pred = health_pipe.predict(test[aces_features])
-metrics["aces_health"] = {
-    "accuracy": float(accuracy_score(test.Health_State, pred)),
-    "balanced_accuracy": float(balanced_accuracy_score(test.Health_State, pred)),
-    "report": classification_report(test.Health_State, pred, output_dict=True),
-}
-joblib.dump(health_pipe, OUT / "aces_health.joblib")
-
-# Healthy-reference statistics used by the Digital Twin.
-healthy = pd.concat([train, val], ignore_index=True)
-healthy = healthy[healthy.Health_State == "Normal"]
-stats = {}
-for state, group in healthy.groupby("Operating_State"):
-    stats[str(state)] = {}
-    for column in num:
-        std = float(group[column].std())
-        stats[str(state)][column] = {
-            "median": float(group[column].median()),
-            "std": std if std > 1e-9 else 1.0,
-        }
-stats["_GLOBAL_"] = {}
-for column in num:
-    std = float(healthy[column].std())
-    stats["_GLOBAL_"][column] = {
-        "median": float(healthy[column].median()),
-        "std": std if std > 1e-9 else 1.0,
-    }
-(OUT / "healthy_reference.json").write_text(json.dumps(stats, indent=2))
-
-# Unsupervised anomaly detector trained only on healthy ACES numeric telemetry.
-anomaly_pipe = Pipeline([
-    ("scale", StandardScaler()),
-    ("model", IsolationForest(n_estimators=120, contamination=0.05, random_state=42, n_jobs=-1)),
-])
-anomaly_pipe.fit(healthy[num].sample(min(50000, len(healthy)), random_state=42))
-joblib.dump(anomaly_pipe, OUT / "aces_anomaly.joblib")
-
-# Supporting Marine fault experiment. Keep domain-specific; do not merge with ACES rows.
-marine_features = num + ["Load"]
-marine_train = pd.read_csv(DATA / "MARINE" / "marine_train.csv")
-marine_test = pd.read_csv(DATA / "MARINE" / "marine_test.csv")
-marine_model = RandomForestClassifier(
-    n_estimators=100, max_depth=20, min_samples_leaf=2,
-    class_weight="balanced_subsample", random_state=42, n_jobs=-1,
-)
-marine_model.fit(marine_train[marine_features], marine_train.Fault_Type)
-marine_pred = marine_model.predict(marine_test[marine_features])
-metrics["marine_fault"] = {
-    "accuracy": float(accuracy_score(marine_test.Fault_Type, marine_pred)),
-    "balanced_accuracy": float(balanced_accuracy_score(marine_test.Fault_Type, marine_pred)),
-    "report": classification_report(marine_test.Fault_Type, marine_pred, output_dict=True),
-}
-joblib.dump({"model": marine_model, "features": marine_features}, OUT / "marine_fault.joblib")
-
-# Supporting CWRU vibration/bearing classifier.
-cwru_features = [
-    "Mean", "Std", "RMS", "Peak", "Peak_to_Peak", "Crest_Factor",
-    "Kurtosis", "Skewness", "Dominant_Frequency", "Spectral_Centroid", "Spectral_Energy",
-]
-cwru_train = pd.read_csv(DATA / "CWRU" / "cwru_train.csv")
-cwru_test = pd.read_csv(DATA / "CWRU" / "cwru_test.csv")
-cwru_model = RandomForestClassifier(
-    n_estimators=150, max_depth=12, class_weight="balanced_subsample",
-    random_state=42, n_jobs=-1,
-)
-cwru_model.fit(cwru_train[cwru_features], cwru_train.Fault)
-cwru_pred = cwru_model.predict(cwru_test[cwru_features])
-metrics["cwru_vibration"] = {
-    "accuracy": float(accuracy_score(cwru_test.Fault, cwru_pred)),
-    "balanced_accuracy": float(balanced_accuracy_score(cwru_test.Fault, cwru_pred)),
-    "report": classification_report(cwru_test.Fault, cwru_pred, output_dict=True),
-}
-joblib.dump({"model": cwru_model, "features": cwru_features}, OUT / "cwru_vibration.joblib")
-
-(OUT / "metrics.json").write_text(json.dumps(metrics, indent=2))
-print(json.dumps({name: {"accuracy": data["accuracy"], "balanced_accuracy": data["balanced_accuracy"]} for name, data in metrics.items()}, indent=2))
+from sklearn.metrics import accuracy_score,balanced_accuracy_score,classification_report
+from sklearn.model_selection import GroupShuffleSplit
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder,StandardScaler
+parser=argparse.ArgumentParser(description="Train AeroPulse-X models");parser.add_argument("--data-dir",required=True);args=parser.parse_args();ROOT=Path(__file__).resolve().parents[1];DATA=Path(args.data_dir).expanduser().resolve();DATA=DATA/"FINAL_DATASET" if (DATA/"FINAL_DATASET").exists() else DATA;OUT=ROOT/"models";SAMPLE=ROOT/"data_sample";OUT.mkdir(exist_ok=True);SAMPLE.mkdir(exist_ok=True);metrics={}
+features=["Engine_RPM","EGT1","EGT2","EGT3","CHT","Fuel_Flow","Oil_Temp","Oil_Pressure","Battery_Voltage","Battery_Current","Alternator_Temp","EFI_Fuel_Temp","EFI_Water_Temp","MAP_Injector","Operating_State"]
+aces_path=DATA/"ACES"/"aces_health.csv";aces=pd.read_csv(aces_path);features=[f for f in features if f in aces.columns];splitter=GroupShuffleSplit(n_splits=1,test_size=.20,random_state=42);tr,te=next(splitter.split(aces,groups=aces["Flight"]));train=aces.iloc[tr].copy();test=aces.iloc[te].copy();split_strategy="held-out flights (GroupShuffleSplit, 20% test)";held_out=sorted(test["Flight"].astype(str).unique().tolist());num=[f for f in features if f!="Operating_State"]
+pre=ColumnTransformer([("num",Pipeline([("imp",SimpleImputer(strategy="median"))]),num),("cat",OneHotEncoder(handle_unknown="ignore"),["Operating_State"])]);health=Pipeline([("pre",pre),("model",RandomForestClassifier(n_estimators=120,max_depth=20,min_samples_leaf=2,class_weight="balanced_subsample",random_state=42,n_jobs=-1))]);health.fit(train[features],train.Health_State);pred=health.predict(test[features]);metrics["aces_health"]={"accuracy":float(accuracy_score(test.Health_State,pred)),"balanced_accuracy":float(balanced_accuracy_score(test.Health_State,pred)),"split_strategy":split_strategy,"held_out_flights":held_out,"features":features,"report":classification_report(test.Health_State,pred,output_dict=True,zero_division=0)};joblib.dump(health,OUT/"aces_health.joblib")
+healthy=train[train.Health_State=="Normal"].copy();stats={}
+for state,group in healthy.groupby("Operating_State"):
+ stats[str(state)]={c:{"median":float(group[c].median()),"std":float(group[c].std()) if np.isfinite(group[c].std()) and group[c].std()>1e-9 else 1.0} for c in num}
+stats["_GLOBAL_"]={c:{"median":float(healthy[c].median()),"std":float(healthy[c].std()) if np.isfinite(healthy[c].std()) and healthy[c].std()>1e-9 else 1.0} for c in num};(OUT/"healthy_reference.json").write_text(json.dumps(stats,indent=2))
+anomaly=Pipeline([("impute",SimpleImputer(strategy="median")),("scale",StandardScaler()),("model",IsolationForest(n_estimators=180,contamination=.05,random_state=42,n_jobs=-1))]);anomaly.fit(healthy[num].sample(min(60000,len(healthy)),random_state=42));joblib.dump(anomaly,OUT/"aces_anomaly.joblib")
+parts=[]
+for label,count in [("Normal",300),("Watch",200),("Warning",150),("Critical",100)]:
+ part=test[test.Health_State==label]
+ if not part.empty:parts.append(part.sample(min(count,len(part)),random_state=42))
+demo=pd.concat(parts,ignore_index=True);demo_cols=features+[c for c in ["Robust_Anomaly_Score","Health_State"] if c in demo.columns];demo[demo_cols].to_csv(SAMPLE/"aces_demo.csv",index=False)
+marine_train=pd.read_csv(DATA/"MARINE"/"marine_train.csv");marine_test=pd.read_csv(DATA/"MARINE"/"marine_test.csv");mf=[f for f in ["Engine_RPM","EGT1","EGT2","EGT3","Fuel_Flow","Oil_Temp","Oil_Pressure","EFI_Fuel_Temp","EFI_Water_Temp","MAP_Injector","Load"] if f in marine_train.columns];mm=RandomForestClassifier(n_estimators=120,max_depth=20,min_samples_leaf=2,class_weight="balanced_subsample",random_state=42,n_jobs=-1);mm.fit(marine_train[mf],marine_train.Fault_Type);mp=mm.predict(marine_test[mf]);metrics["marine_fault_research"]={"accuracy":float(accuracy_score(marine_test.Fault_Type,mp)),"balanced_accuracy":float(balanced_accuracy_score(marine_test.Fault_Type,mp)),"role":"supporting cross-domain fault-signature research; not deployed as MALE-UAV diagnosis","report":classification_report(marine_test.Fault_Type,mp,output_dict=True,zero_division=0)};joblib.dump({"model":mm,"features":mf,"research_only":True},OUT/"marine_fault_research.joblib")
+cf=["Mean","Std","RMS","Peak","Peak_to_Peak","Crest_Factor","Kurtosis","Skewness","Dominant_Frequency","Spectral_Centroid","Spectral_Energy"];ct=pd.read_csv(DATA/"CWRU"/"cwru_train.csv");ce=pd.read_csv(DATA/"CWRU"/"cwru_test.csv");cm=RandomForestClassifier(n_estimators=180,max_depth=14,class_weight="balanced_subsample",random_state=42,n_jobs=-1);cm.fit(ct[cf],ct.Fault);cp=cm.predict(ce[cf]);metrics["cwru_vibration"]={"accuracy":float(accuracy_score(ce.Fault,cp)),"balanced_accuracy":float(balanced_accuracy_score(ce.Fault,cp)),"role":"supporting vibration/bearing-condition research; not target-engine validation","report":classification_report(ce.Fault,cp,output_dict=True,zero_division=0)};joblib.dump({"model":cm,"features":cf},OUT/"cwru_vibration.joblib");pd.concat([g.sample(min(25,len(g)),random_state=42) for _,g in ce.groupby("Fault")],ignore_index=True).to_csv(SAMPLE/"cwru_demo.csv",index=False)
+(OUT/"metrics.json").write_text(json.dumps(metrics,indent=2));manifest={"project":"AeroPulse-X","model_version":"1.0.0-sih","python":platform.python_version(),"scikit_learn":sklearn.__version__,"aces":{"role":"primary UAV operational/health dataset","features":features,"target":"Health_State","leakage_exclusions":["Robust_Anomaly_Score","Robust_Max_Deviation","Sensors_Above_2Sigma","Sensors_Above_3Sigma","*_rz derived robust-z features"],"split_strategy":split_strategy,"held_out_flights":held_out},"marine":{"role":"supporting fault-signature research only"},"cwru":{"role":"supporting vibration/bearing research only"},"rul":{"runtime_status":"method demonstrator from mission trend","validation_gap":"target-domain run-to-failure trajectories are not available in the supplied datasets"}};(OUT/"model_manifest.json").write_text(json.dumps(manifest,indent=2));print(json.dumps({k:{"accuracy":v.get("accuracy"),"balanced_accuracy":v.get("balanced_accuracy"),"role":v.get("role")} for k,v in metrics.items()},indent=2));print(f"Demo telemetry written to {SAMPLE/'aces_demo.csv'}")
