@@ -31,7 +31,6 @@ class ReducedOrderPistonEngine:
 
     @staticmethod
     def air_density_ratio(altitude_ft: float, ambient_c: float) -> float:
-        # Reduced ISA-inspired relation; bounded for prototype use.
         altitude_km = max(0.0, altitude_ft) / 3280.84
         temp_ratio = (ambient_c + 273.15) / 288.15
         density = math.exp(-altitude_km / 8.4) / temp_ratio
@@ -50,7 +49,6 @@ class ReducedOrderPistonEngine:
             aerodynamic_load if inputs.load is None else float(inputs.load), 0.05, 1.15
         )
 
-        # Reduced-order fuel/combustion relationship.
         fuel_flow = 18.0 + 105.0 * load * (0.82 + 0.18 * rpm_ratio) / math.sqrt(density_ratio)
         combustion_factor = self._clamp(0.82 + 0.18 * density_ratio, 0.65, 1.05)
         base_egt = 410.0 + 315.0 * load * combustion_factor + 22.0 * (rpm_ratio - 1.0)
@@ -63,10 +61,9 @@ class ReducedOrderPistonEngine:
         vibration = 0.10 + 0.20 * rpm_ratio**2 + 0.35 * load**2
         efficiency = self._clamp(0.30 + 0.43 * load * combustion_factor - 0.08 * abs(rpm_ratio - 1.0), 0.20, 0.78)
 
-        # Small cylinder-to-cylinder spread rather than identical EGTs.
         egt1 = egt_mean * 0.985
         egt2 = egt_mean * 1.012
-        egt3 = egt_mean * 1.000
+        egt3 = egt_mean
 
         map_injector = 65.0 + 35.0 * throttle * density_ratio
         battery_voltage = self._clamp(13.7 - 0.35 * load, 12.4, 14.2)
@@ -95,3 +92,22 @@ class ReducedOrderPistonEngine:
             "Load": load,
             "Air_Density_Ratio": density_ratio,
         }
+
+    def simulate(
+        self,
+        rpm: float = 3000.0,
+        throttle: float = 0.60,
+        altitude_ft: float = 3000.0,
+        ambient_c: float = 25.0,
+        load: float | None = None,
+    ) -> dict[str, float]:
+        """Convenience runtime interface used by the mission simulator."""
+        return self.predict(
+            EngineInputs(
+                rpm=rpm,
+                throttle=throttle,
+                altitude_ft=altitude_ft,
+                ambient_c=ambient_c,
+                load=load,
+            )
+        )
