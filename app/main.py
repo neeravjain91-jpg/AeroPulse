@@ -7,6 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,Field
 from .config import DATA_SAMPLE_DIR,MODEL_DIR,PROJECT_NAME,PROJECT_VERSION,REQUIRED_MODEL_FILES,STATIC_DIR
 from .inference import AeroTwinAI
+from .mission_whatif import MissionScenario
+from .mission_whatif_rul import MissionWhatIfRUL
 from .replay import run_replay
 from .risk import mission_risk
 from .simulator import FAULTS,inject_fault,mission_adjust
@@ -25,6 +27,9 @@ class Scenario(BaseModel):
  fault:str="none";severity:float=Field(0.6,ge=0,le=1);altitude_ft:float=Field(8000,ge=0,le=60000);ambient_c:float=Field(35,ge=-60,le=80);duration_h:float=Field(6,gt=0,le=48);rapid_throttle:bool=False;operating_state:str="CRUISE"
 class ReplayScenario(Scenario):
  steps:int=Field(48,ge=12,le=180);step_minutes:float=Field(5.0,ge=0.5,le=60);fault_onset_ratio:float=Field(0.35,ge=0,le=0.95)
+class WhatIfRequest(BaseModel):
+ baseline:Scenario
+ alternative:Scenario
 def _require_ai():
  if _ai is None:raise HTTPException(503,detail={"message":"Model assets are not ready. Train the models first.","command":'python scripts/train_models.py --data-dir "C:\\path\\to\\FINAL_DATASET"',"error":_ai_error})
  return _ai
@@ -55,7 +60,10 @@ def sample(operating_state:str="CRUISE"):return _base_sample(operating_state)[0]
 def analyze(scenario:Scenario):
  ai=_require_ai()
  if scenario.fault not in FAULTS:raise HTTPException(400,detail=f"Unsupported fault: {scenario.fault}")
- base,source=_base_sample(scenario.operating_state);mission=mission_adjust(base,scenario.altitude_ft,scenario.ambient_c,scenario.duration_h,scenario.rapid_throttle);altered=inject_fault(mission,scenario.fault,scenario.severity);result=ai.analyze(altered,context=scenario.model_dump());risk=mission_risk(result,scenario.model_dump());result.update({"telemetry":altered,"source_reference_state":source,"scenario":scenario.model_dump(),"mission_risk":risk,"mission_risk_score":risk["score"],"mission_risk_level":risk["level"],"rul_method_demonstrator":{"available":False,"rul_hours":None,"status":"REQUIRES_TIMELINE","note":"Run Mission Replay to estimate the prototype degradation/RUL horizon from a trend, not a single snapshot."}});return result
+ base,source=_base_sample(scenario.operating_state);mission=mission_adjust(base,scenario.altitude_ft,scenario.ambient_c,scenario.duration_h,scenario.rapid_throttle);altered=inject_fault(mission,scenario.fault,scenario.severity);result=ai.analyze(altered,context=scenario.model_dump());risk=mission_risk(result,scenario.model_dump());result.update({"telemetry":altered,"source_reference_state":source,"scenario":scenario.model_dump(),"mission_risk":risk,"mission_risk_score":risk["score"],"mission_risk_level":risk["level"]});return result
+@app.post("/api/mission-whatif-rul")
+def mission_whatif_rul(request:WhatIfRequest):
+ _require_ai();base,source=_base_sample(request.baseline.operating_state);engine=MissionWhatIfRUL({"injector":0.05,"lubrication":0.04,"thermal":0.03,"mechanical":0.02,"electrical":0.01,"sensor":0.02});result=engine.compare(base,MissionScenario(**request.baseline.model_dump()),MissionScenario(**request.alternative.model_dump()));result["source_reference_state"]=source;return result
 @app.post("/api/replay")
 def replay(scenario:ReplayScenario):
  ai=_require_ai();base,source=_base_sample(scenario.operating_state);payload=scenario.model_dump();result=run_replay(ai,base,payload,scenario.steps,scenario.step_minutes,scenario.fault_onset_ratio);result["scenario"]=payload;result["source_reference_state"]=source;result["disclaimer"]="Mission replay, early-warning and RUL outputs are prototype method demonstrations, not operational airworthiness determinations.";return result
