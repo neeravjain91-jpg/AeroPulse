@@ -35,7 +35,7 @@ GCS-style dashboard
 - Marine-engine fault experiment retained as supporting research, not claimed as validated MALE-UAV diagnosis
 
 ## Repository policy
-Raw datasets, trained `.joblib` artifacts, virtual environments, caches and `node_modules` are intentionally not tracked. Train the models locally from your dataset.
+Raw datasets, trained `.joblib` artifacts, virtual environments, caches and `node_modules` are intentionally not tracked. This avoids committing large generated binaries and keeps the repository reproducible.
 
 ## Quick start
 
@@ -43,11 +43,30 @@ Raw datasets, trained `.joblib` artifacts, virtual environments, caches and `nod
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+
 python scripts/train_models.py --data-dir "C:\path\to\FINAL_DATASET"
+python scripts/export_demo_sample.py --data-dir "C:\path\to\FINAL_DATASET"
+
 python run.py
 ```
 
 Open **http://127.0.0.1:8000/**.
+
+## Expected generated files
+After training/exporting, the following local files are created and used by the app:
+
+```text
+models/
+├── aces_health.joblib
+├── aces_anomaly.joblib
+├── marine_fault.joblib
+├── cwru_vibration.joblib
+├── healthy_reference.json
+└── metrics.json
+
+data_sample/
+└── aces_demo.csv
+```
 
 ## Scientific limitations
 This is an SIH proof-of-concept, not a certified flight-safety system. Mission-risk rules and simplified environmental response functions must be replaced by validated aero-piston-engine maps/physics for operational use. Marine and CWRU data are supporting domains and must not be presented as MALE-UAV validation.
