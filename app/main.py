@@ -47,6 +47,8 @@ def _base_sample(operating_state):
  if not state_rows.empty:candidates=state_rows
  if "Robust_Anomaly_Score" in candidates.columns:candidates=candidates.sort_values("Robust_Anomaly_Score")
  row=candidates.iloc[0].to_dict();source=str(row.get("Health_State")) if "Health_State" in row else None;return _clean_row(row),source
+def _mission_scenario(model:Scenario,name:str):
+ return MissionScenario(name=name,altitude_ft=model.altitude_ft,ambient_c=model.ambient_c,duration_h=model.duration_h,rapid_throttle=model.rapid_throttle)
 @app.get("/",response_class=HTMLResponse)
 def home():
  html=(STATIC_DIR/"index.html").read_text(encoding="utf-8")
@@ -65,7 +67,7 @@ def analyze(scenario:Scenario):
  base,source=_base_sample(scenario.operating_state);mission=mission_adjust(base,scenario.altitude_ft,scenario.ambient_c,scenario.duration_h,scenario.rapid_throttle);altered=inject_fault(mission,scenario.fault,scenario.severity);result=ai.analyze(altered,context=scenario.model_dump());risk=mission_risk(result,scenario.model_dump());result.update({"telemetry":altered,"source_reference_state":source,"scenario":scenario.model_dump(),"mission_risk":risk,"mission_risk_score":risk["score"],"mission_risk_level":risk["level"]});return result
 @app.post("/api/mission-whatif-rul")
 def mission_whatif_rul(request:WhatIfRequest):
- _require_ai();base,source=_base_sample(request.baseline.operating_state);engine=MissionWhatIfRUL({"injector":0.05,"lubrication":0.04,"thermal":0.03,"mechanical":0.02,"electrical":0.01,"sensor":0.02});result=engine.compare(base,MissionScenario(**request.baseline.model_dump()),MissionScenario(**request.alternative.model_dump()));result["source_reference_state"]=source;return result
+ _require_ai();base,source=_base_sample(request.baseline.operating_state);engine=MissionWhatIfRUL({"injector":0.05,"lubrication":0.04,"thermal":0.03,"mechanical":0.02,"electrical":0.01,"sensor":0.02});result=engine.compare(base,_mission_scenario(request.baseline,"baseline"),_mission_scenario(request.alternative,"alternative"));result["source_reference_state"]=source;return result
 @app.post("/api/replay")
 def replay(scenario:ReplayScenario):
  ai=_require_ai();base,source=_base_sample(scenario.operating_state);payload=scenario.model_dump();result=run_replay(ai,base,payload,scenario.steps,scenario.step_minutes,scenario.fault_onset_ratio);result["scenario"]=payload;result["source_reference_state"]=source;result["disclaimer"]="Mission replay, early-warning and RUL outputs are prototype method demonstrations, not operational airworthiness determinations.";return result
