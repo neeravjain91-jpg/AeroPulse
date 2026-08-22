@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import copy
 
+from .degradation_model import ContinuousDegradationModel
 from .engine_model import ReducedOrderPistonEngine
 
 FAULTS = {"none", "overheating", "lubrication", "misfire", "injector", "sensor_drift", "electrical"}
 
 _ENGINE = ReducedOrderPistonEngine()
+_DEGRADATION = ContinuousDegradationModel()
 
 
 def inject_fault(telemetry: dict, fault: str = "none", severity: float = 0.6):
@@ -28,13 +30,18 @@ def inject_fault(telemetry: dict, fault: str = "none", severity: float = 0.6):
     return data
 
 
-def mission_adjust(telemetry: dict, altitude_ft: float = 3000, ambient_c: float = 25, duration_h: float = 4, rapid_throttle: bool = False):
-    """Generate mission-conditioned telemetry through the reduced-order engine model."""
+def mission_adjust(
+    telemetry: dict,
+    altitude_ft: float = 3000,
+    ambient_c: float = 25,
+    duration_h: float = 4,
+    rapid_throttle: bool = False,
+    degradation_rates: dict[str, float] | None = None,
+):
+    """Generate mission-conditioned telemetry and apply time-dependent degradation."""
     data = copy.deepcopy(telemetry)
     rpm = float(data.get("Engine_RPM", 3000.0))
     fuel_flow = float(data.get("Fuel_Flow", 30.0))
-    # ACES fuel-flow values are not throttle commands. Map them into a bounded
-    # prototype throttle proxy so mission changes remain meaningful.
     throttle = max(0.20, min(0.90, fuel_flow / 50.0))
     if rapid_throttle:
         throttle = min(1.0, throttle + 0.08)
@@ -58,4 +65,6 @@ def mission_adjust(telemetry: dict, altitude_ft: float = 3000, ambient_c: float 
     for key in ["Load", "Air_Density_Ratio", "Vibration", "Efficiency"]:
         if key in model:
             data[key] = float(model[key])
-    return data
+
+    state = _DEGRADATION.state_at(duration_h, degradation_rates)
+    return _DEGRADATION.apply(data, state)
