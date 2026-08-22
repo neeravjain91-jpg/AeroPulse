@@ -1,28 +1,10 @@
-# Next build stages
+# Next Engineering Steps
 
-## Priority 1 — Mission replay
-- preserve timestamped sequences
-- timeline scrubber
-- first-anomaly marker
-- threshold-vs-AI lead-time comparison
+1. Replace demonstrator mission-response functions with validated aero-piston thermodynamic/performance maps.
+2. Add real ECU/FADEC telemetry through CAN/SocketCAN when hardware/logs are available.
+3. Obtain target-domain degradation/run-to-failure sequences for operational RUL development.
+4. Add target-engine accelerometer/vibration data instead of relying only on CWRU methodology.
+5. Add injection-timing/ECU fields when the target schema is available.
+6. Add persistent mission storage, fleet analytics, roles, audit logging, secure telemetry and edge packaging.
 
-## Priority 2 — Better physics layer
-- obtain target aero-piston performance maps or validated simulation data
-- model altitude, mixture, cooling and throttle-transient behaviour
-- calibrate reference state by mission/engine phase
-
-## Priority 3 — RUL
-Current datasets do not yet provide a clean target-engine run-to-failure/RUL label. Do not fabricate an operational RUL model. Add a suitable degradation/run-to-failure dataset or a clearly labelled simulated degradation benchmark and report uncertainty.
-
-## Priority 4 — CAN/edge
-- python-can + SocketCAN adapter
-- telemetry schema validation
-- local inference container
-- secure GCS channel
-
-## Priority 5 — Validation
-- mission/group-level split
-- false alarm rate
-- detection lead time
-- calibration
-- missing-sensor/noise robustness
+SIH priority: do not add federated learning, 3D graphics or cloud complexity until `telemetry → twin → residual → AI → diagnosis → degradation → mission decision` works end-to-end.
