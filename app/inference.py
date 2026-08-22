@@ -7,6 +7,7 @@ import pandas as pd
 from .advisory import fault_advisory, maintenance_advice
 from .config import MODEL_DIR
 from .digital_twin import PARAMS, ReferenceTwin
+from .sensor_health import assess_sensor_health
 
 HEALTH_ORDER = {"Normal": 0, "Watch": 1, "Warning": 2, "Critical": 3}
 
@@ -17,39 +18,33 @@ class AeroTwinAI:
         self.anomaly = joblib.load(MODEL_DIR / "aces_anomaly.joblib")
         self.twin = ReferenceTwin()
 
-    def analyze(self, telemetry: dict):
+    def analyze(self, telemetry: dict, context: dict | None = None):
         columns = PARAMS + ["Operating_State"]
+        missing = [column for column in columns if column not in telemetry]
+        if missing: raise ValueError(f"Missing telemetry fields: {missing}")
         health_frame = pd.DataFrame([{column: telemetry[column] for column in columns}])
-
         probability = self.health.predict_proba(health_frame)[0]
         classes = self.health.classes_
         prediction = str(classes[int(np.argmax(probability))])
         probabilities = {str(label): float(value) for label, value in zip(classes, probability)}
-
         anomaly_frame = pd.DataFrame([{parameter: telemetry[parameter] for parameter in PARAMS}])
         anomaly_score = float(-self.anomaly.decision_function(anomaly_frame)[0])
-
-        twin = self.twin.compare(telemetry)
-        findings = fault_advisory(telemetry, twin)
-        health_index = max(
-            0.0,
-            100.0
-            - (
-                HEALTH_ORDER.get(prediction, 1) * 22
-                + min(twin["residual_rms"], 10) * 2.0
-            ),
-        )
-
+        twin = self.twin.compare(telemetry, context=context)
+        anomaly_flag = anomaly_score > 0.005 and float(twin["residual_rms"]) >= 2.0
+        sensor_health = assess_sensor_health(telemetry, twin)
+        findings = fault_advisory(telemetry, twin, sensor_health)
+        health_index = max(0.0, min(100.0, 100.0 - HEALTH_ORDER.get(prediction, 1) * 18.0 - min(float(twin["residual_rms"]), 12.0) * 4.0 - max(0.0, 100.0 - sensor_health["overall_trust_score"]) * 0.10))
+        if health_index >= 85: fused_state = "Normal"
+        elif health_index >= 65: fused_state = "Watch"
+        elif health_index >= 40: fused_state = "Warning"
+        else: fused_state = "Critical"
+        confidence = float(max(probability))
         return {
-            "health_state": prediction,
-            "health_probabilities": probabilities,
-            "health_index": round(health_index, 1),
-            "anomaly_score": round(anomaly_score, 4),
-            "twin": twin,
-            "fault_candidates": [
-                {"name": name, "severity": severity, "evidence": evidence}
-                for name, severity, evidence in findings
-            ],
-            "maintenance_advisory": maintenance_advice(findings),
+            "health_state": fused_state, "ml_health_state": prediction,
+            "health_confidence": round(confidence, 4), "health_probabilities": probabilities,
+            "health_index": round(health_index, 1), "anomaly_score": round(anomaly_score, 4),
+            "anomaly_flag": anomaly_flag, "twin": twin, "sensor_health": sensor_health,
+            "fault_candidates": [{"name": name, "severity": severity, "evidence": evidence} for name, severity, evidence in findings],
+            "maintenance_advisory": maintenance_advice(findings, sensor_health),
             "disclaimer": "Prototype decision-support output; not an airworthiness or flight-safety determination.",
         }
