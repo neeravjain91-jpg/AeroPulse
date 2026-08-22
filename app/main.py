@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio,json
 import pandas as pd
 from fastapi import FastAPI,HTTPException,WebSocket,WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse,HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,Field
 from .config import DATA_SAMPLE_DIR,MODEL_DIR,PROJECT_NAME,PROJECT_VERSION,REQUIRED_MODEL_FILES,STATIC_DIR
@@ -47,8 +47,10 @@ def _base_sample(operating_state):
  if not state_rows.empty:candidates=state_rows
  if "Robust_Anomaly_Score" in candidates.columns:candidates=candidates.sort_values("Robust_Anomaly_Score")
  row=candidates.iloc[0].to_dict();source=str(row.get("Health_State")) if "Health_State" in row else None;return _clean_row(row),source
-@app.get("/")
-def home():return FileResponse(STATIC_DIR/"index.html")
+@app.get("/",response_class=HTMLResponse)
+def home():
+ html=(STATIC_DIR/"index.html").read_text(encoding="utf-8")
+ return html.replace("</body>",'<script src="/static/dashboard_phase6.js"></script></body>')
 @app.get("/api/status")
 def status():
  return {"project":PROJECT_NAME,"version":PROJECT_VERSION,"models_ready":_ai is not None,"model_files":{n:(MODEL_DIR/n).exists() for n in REQUIRED_MODEL_FILES},"demo_ready":_demo is not None and not _demo.empty,"available_faults":sorted(FAULTS),"operating_states":_ai.twin.operating_states if _ai else [],"metrics_ready":(MODEL_DIR/"metrics.json").exists(),"vibration_model_ready":_vibration_ai is not None,"vibration_demo_ready":_vibration_demo is not None and not _vibration_demo.empty,"setup_error":_ai_error,"safety_note":"Research/SIH prototype; not certified for flight-safety or airworthiness decisions."}
