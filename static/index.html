@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AeroTwin-MALE</title>
+<style>
+body{font-family:Inter,system-ui,Arial;background:#0c1220;color:#edf3ff;margin:0}.wrap{max-width:1180px;margin:auto;padding:28px}.card{background:#151e31;border:1px solid #263550;border-radius:16px;padding:18px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.kpi{font-size:28px;font-weight:700}.muted{color:#9fb0cb}.good{color:#74e39a}.warn{color:#ffd166}.bad{color:#ff7b7b}input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:9px;border:1px solid #344663;background:#0e1728;color:white}button{background:#2d6cdf;font-weight:700;cursor:pointer}table{width:100%;border-collapse:collapse}td{padding:7px;border-bottom:1px solid #263550}.title{display:flex;justify-content:space-between;align-items:center}code{color:#a9c8ff}.pill{padding:4px 9px;border-radius:999px;background:#263550}</style></head>
+<body><div class="wrap"><div class="title"><div><h1>AeroTwin-MALE</h1><div class="muted">Mission-aware Digital Twin demonstrator for UAV piston-engine health</div></div><span class="pill">SIH26054 Prototype</span></div>
+<div class="card"><h2>Test Scenario</h2><div class="grid">
+<label>Fault<select id="fault"><option>none</option><option>overheating</option><option>lubrication</option><option>misfire</option><option>injector</option><option>sensor_drift</option></select></label>
+<label>Severity<input id="severity" type="number" min="0" max="1" step="0.1" value="0.6"></label>
+<label>Altitude (ft)<input id="altitude" type="number" value="8000"></label>
+<label>Ambient °C<input id="ambient" type="number" value="35"></label>
+<label>Duration (h)<input id="duration" type="number" value="6"></label>
+<label>Rapid throttle<select id="throttle"><option value="false">No</option><option value="true">Yes</option></select></label>
+</div><br><button onclick="run()">Run Digital Twin Test</button></div>
+<div class="grid"><div class="card"><div class="muted">Health State</div><div id="health" class="kpi">—</div></div><div class="card"><div class="muted">Health Index</div><div id="index" class="kpi">—</div></div><div class="card"><div class="muted">Mission Risk</div><div id="risk" class="kpi">—</div></div><div class="card"><div class="muted">Twin Residual RMS</div><div id="residual" class="kpi">—</div></div></div>
+<div class="grid"><div class="card"><h2>AI Diagnostics</h2><div id="faults">Run a scenario.</div><p id="advice" class="muted"></p></div><div class="card"><h2>Live Telemetry</h2><table id="telemetry"></table></div></div>
+<div class="card"><h2>Expected vs Observed</h2><table id="compare"></table></div><div class="card muted">Research prototype only. Mission-risk and maintenance outputs are decision-support demonstrations, not operational airworthiness determinations.</div></div>
+<script>
+function cls(v){return v==='Normal'||v==='LOW'?'good':v==='Watch'||v==='MEDIUM'?'warn':'bad'}
+async function run(){let p={fault:fault.value,severity:+severity.value,altitude_ft:+altitude.value,ambient_c:+ambient.value,duration_h:+duration.value,rapid_throttle:throttle.value==='true'};let r=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}).then(x=>x.json());
+health.textContent=r.health_state;health.className='kpi '+cls(r.health_state);index.textContent=r.health_index+' / 100';risk.textContent=r.mission_risk_level+' ('+r.mission_risk_score+')';risk.className='kpi '+cls(r.mission_risk_level);residual.textContent=r.twin.residual_rms.toFixed(2);
+faults.innerHTML=r.fault_candidates.map(x=>`<p><b>${x.name}</b> — ${x.severity}<br><span class="muted">${x.evidence.join(', ')}</span></p>`).join('');advice.textContent=r.maintenance_advisory;
+telemetry.innerHTML=Object.entries(r.telemetry).map(([k,v])=>`<tr><td>${k}</td><td>${typeof v==='number'?v.toFixed(2):v}</td></tr>`).join('');
+compare.innerHTML=Object.keys(r.twin.expected).map(k=>`<tr><td>${k}</td><td>Expected ${r.twin.expected[k].toFixed(2)}</td><td>Observed ${(+r.telemetry[k]).toFixed(2)}</td><td>z=${r.twin.z_scores[k].toFixed(2)}</td></tr>`).join('');}
+run();</script></body></html>
