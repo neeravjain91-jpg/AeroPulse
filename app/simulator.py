@@ -29,17 +29,13 @@ def inject_fault(telemetry: dict, fault: str = "none", severity: float = 0.6):
 
 
 def mission_adjust(telemetry: dict, altitude_ft: float = 3000, ambient_c: float = 25, duration_h: float = 4, rapid_throttle: bool = False):
-    """Generate mission-conditioned telemetry through the reduced-order engine model.
-
-    Existing telemetry values are retained as the operating reference, while the
-    engine model supplies the causal mission response. This keeps the legacy replay
-    interface compatible with the existing ACES-derived baseline.
-    """
+    """Generate mission-conditioned telemetry through the reduced-order engine model."""
     data = copy.deepcopy(telemetry)
     rpm = float(data.get("Engine_RPM", 3000.0))
-    fuel_flow = float(data.get("Fuel_Flow", 0.0))
-    throttle = 0.72 if fuel_flow <= 0 else max(0.0, min(1.0, fuel_flow / max(fuel_flow, 1e-9)))
-    load = None
+    fuel_flow = float(data.get("Fuel_Flow", 30.0))
+    # ACES fuel-flow values are not throttle commands. Map them into a bounded
+    # prototype throttle proxy so mission changes remain meaningful.
+    throttle = max(0.20, min(0.90, fuel_flow / 50.0))
     if rapid_throttle:
         throttle = min(1.0, throttle + 0.08)
 
@@ -48,12 +44,9 @@ def mission_adjust(telemetry: dict, altitude_ft: float = 3000, ambient_c: float 
         throttle=throttle,
         altitude_ft=altitude_ft,
         ambient_c=ambient_c,
-        load=load,
+        load=None,
     )
 
-    # Blend the model response with the observed/reference baseline. The model
-    # provides physically coupled directionality without replacing the calibrated
-    # ACES telemetry distribution used by the rest of the prototype.
     for key in [
         "Engine_RPM", "EGT1", "EGT2", "EGT3", "CHT", "Fuel_Flow",
         "Oil_Temp", "Oil_Pressure", "EFI_Water_Temp", "MAP_Injector",
