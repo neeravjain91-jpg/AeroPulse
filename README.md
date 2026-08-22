@@ -1,72 +1,82 @@
-# AeroPulse-X — AeroTwin-MALE
+# AeroPulse-X — Mission-Aware Digital Twin for MALE-UAV Engine Health
 
-Research-grade SIH26054 prototype for an AI-enabled, mission-aware Digital Twin for MALE-UAV aero-piston engine health monitoring.
+**SIH26054 research prototype** for an AI-enabled Digital Twin of a MALE-UAV aero-piston engine.
 
 ## Core flow
 
 ```text
-Telemetry / simulator
+Telemetry / mission simulator
         ↓
-Healthy-reference Digital Twin
+Context-aware healthy-reference Digital Twin
         ↓
 Expected ↔ Observed residuals
         ↓
-AI health + anomaly models
+AI health classification + anomaly detection
         ↓
-Fault evidence / sensor checks
+Sensor-trust assessment + fault evidence
         ↓
-Mission-condition simulation
+Mission-risk analysis + maintenance advisory
         ↓
-Risk + maintenance advisory
+Mission replay + degradation/RUL methodology demonstrator
         ↓
 GCS-style dashboard
 ```
 
-## Current prototype
-- ACES-based four-state engine health model: Normal / Watch / Warning / Critical
-- Leakage-safe feature set (`Robust_Anomaly_Score` is excluded from model inputs)
-- Healthy-reference Digital Twin by operating state
-- Residual and z-score comparison between expected and observed telemetry
-- Unsupervised anomaly detection trained on healthy ACES telemetry
-- Controlled fault injection: overheating, lubrication degradation, misfire-like behaviour, injector abnormality and sensor drift
-- Mission simulation: altitude, ambient temperature, endurance duration and rapid throttle
-- Prototype maintenance advisory layer
-- CWRU vibration/bearing supporting model
-- Marine-engine fault experiment retained as supporting research, not claimed as validated MALE-UAV diagnosis
+## Current build
 
-## Repository policy
-Raw datasets, trained `.joblib` artifacts, virtual environments, caches and `node_modules` are intentionally not tracked. This avoids committing large generated binaries and keeps the repository reproducible.
+- ACES UAV data as the primary engine-health source
+- Normal / Watch / Warning / Critical health monitoring
+- leakage-safe inputs: Robust_Anomaly_Score and derived robust-z fields are excluded
+- held-out-flight validation when full ACES health data are available
+- context-aware Digital Twin for altitude, temperature, endurance and rapid throttle
+- Isolation Forest trained only on healthy ACES samples
+- controlled overheating, lubrication, misfire-like, injector, sensor-drift and electrical faults
+- sensor-trust logic and explainable maintenance advisory
+- explainable mission-risk / mission-reliability index
+- mission replay with fault onset and warning timing
+- prototype degradation/RUL trend method
+- separate CWRU vibration module
+- Marine fault experiment retained as research-only
+- FastAPI REST + WebSocket backend and GCS dashboard
 
-## Quick start
+## Quick start — Windows PowerShell
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-
 python scripts/train_models.py --data-dir "C:\path\to\FINAL_DATASET"
-python scripts/export_demo_sample.py --data-dir "C:\path\to\FINAL_DATASET"
-
 python run.py
 ```
 
-Open **http://127.0.0.1:8000/**.
+Open **http://127.0.0.1:8000/**. FastAPI docs are at **http://127.0.0.1:8000/docs**.
 
-## Expected generated files
-After training/exporting, the following local files are created and used by the app:
+`0.0.0.0:8000` is the bind address; do not type it into the browser.
 
-```text
-models/
-├── aces_health.joblib
-├── aces_anomaly.joblib
-├── marine_fault.joblib
-├── cwru_vibration.joblib
-├── healthy_reference.json
-└── metrics.json
+## Model validation
 
-data_sample/
-└── aces_demo.csv
-```
+The richer ACES training path uses raw measurements including RPM, EGT1/2/3, CHT, fuel flow, oil temperature/pressure, battery voltage/current, alternator temperature, EFI temperatures, MAP injector and operating state. Test evaluation is grouped by held-out **Flight** IDs to reduce leakage from neighbouring telemetry rows.
 
-## Scientific limitations
-This is an SIH proof-of-concept, not a certified flight-safety system. Mission-risk rules and simplified environmental response functions must be replaced by validated aero-piston-engine maps/physics for operational use. Marine and CWRU data are supporting domains and must not be presented as MALE-UAV validation.
+The reference build on the supplied dataset produced approximately **87.2% ACES health accuracy** and **80.4% balanced accuracy**. Use your locally generated `models/metrics.json` as the authoritative result for each run.
+
+## RUL
+
+The supplied datasets do not provide clean MALE-UAV aero-piston run-to-failure trajectories, so AeroPulse-X does not claim operational RUL accuracy. Mission Replay provides a clearly labelled trend-extrapolation method demonstrator. `scripts/train_rul_cmapss.py` optionally validates an RUL workflow on NASA C-MAPSS-style turbofan benchmark files; that is methodology validation only, not piston-engine validation.
+
+## API
+
+- `GET /api/status`
+- `POST /api/analyze`
+- `POST /api/replay`
+- `GET /api/metrics`
+- `GET /api/model-manifest`
+- `GET /api/vibration/demo`
+- `POST /api/reload`
+- `WS /ws/telemetry`
+
+## Safety / scientific scope
+
+This is an **SIH/research demonstrator**, not a certified flight-safety, airworthiness, maintenance-release or operational defence system. Mission-risk, sensor-trust and RUL outputs require validation using the target aero-piston engine, approved performance maps, calibrated sensors and degradation evidence before operational use.
+
+> **Pitch:** AeroPulse-X continuously mirrors expected engine behaviour, compares it with observed telemetry, detects and explains emerging anomalies, evaluates sensor trust, projects degradation, replays mission behaviour, and translates engine condition into mission-level maintenance decision support.

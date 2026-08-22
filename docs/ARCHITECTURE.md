@@ -1,30 +1,29 @@
-# Architecture
+# AeroPulse-X Architecture
+
+The Digital Twin is the central intelligence layer, not a 3D graphic.
 
 ```text
-Telemetry / Simulator
-        ↓
-Validation + preprocessing
-        ↓
-Healthy-reference Digital Twin
-        ↓
-Expected ↔ Observed → residuals
-        ↓
-AI health model + anomaly model
-        ↓
-Fault evidence / sensor checks
-        ↓
-Health / degradation layer
-        ↓
-Mission scenario engine
-        ↓
-Risk + maintenance advisory
-        ↓
-GCS dashboard / replay
+ECU / FADEC / CAN / simulated telemetry
+                 ↓
+        validation + synchronization
+                 ↓
+       mission-context model
+                 ↓
+   context-aware healthy Digital Twin
+                 ↓
+        Expected ↔ Observed
+                 ↓
+ residuals / z-scores / percentage deviation
+                 ↓
+ Health AI + Isolation Forest + Sensor trust
+                 ↓
+       fault evidence engine
+                 ↓
+ degradation / mission replay / risk
+                 ↓
+ maintenance decision support + GCS
 ```
 
-## Innovation focus
-1. Hybrid reference-twin + data-driven residual intelligence.
-2. Mission-aware health interpretation rather than threshold alerting only.
-3. Explainable expected-vs-observed evidence.
-4. Sensor-drift scenario handling.
-5. Modular architecture ready for CAN/SocketCAN and higher-fidelity physics maps.
+ACES is the primary UAV dataset. CWRU remains a separate vibration/bearing methodology module. Marine Engine data remain supporting fault-signature research because the supplied cross-condition generalization is weak. These datasets are not concatenated row-by-row.
+
+The mission-context response functions are transparent demonstrator functions and must later be replaced by validated aero-piston thermodynamic/performance maps. Runtime RUL is likewise a method demonstrator until target-domain run-to-failure data are available.
