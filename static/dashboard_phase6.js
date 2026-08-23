@@ -69,7 +69,9 @@
             return;
         }
 
-        const data = window.__aeropulseLatestAnalysis;
+        const data =
+    window.__aeropulseLiveState ||
+    window.__aeropulseLatestAnalysis;
 
         if (!data || !data.telemetry) {
             return;
