@@ -13,4 +13,147 @@ Mission replay + degradation/RUL method demo
 GCS decision support
 
 Supporting research: CWRU vibration • Marine fault signatures
-Future: ECU/FADEC → CAN/SocketCAN → edge inference → GCS/fleet analytics</div></div><div class="footer">Research/SIH demonstrator only. Mission-risk, sensor-trust and RUL outputs are not certified airworthiness determinations.</div></div><script>const $=id=>document.getElementById(id),fmt=(v,d=2)=>typeof v==='number'&&Number.isFinite(v)?v.toFixed(d):String(v??'—');function scenario(x={}){return{fault:$('fault').value,severity:+$('severity').value,altitude_ft:+$('altitude').value,ambient_c:+$('ambient').value,duration_h:+$('duration').value,rapid_throttle:$('throttle').value==='true',operating_state:$('operating').value,...x}}function cls(v){return['Normal','LOW','TRUSTED'].includes(v)?'good':['Watch','MEDIUM','CHECK'].includes(v)?'warn':['Critical','HIGH','SUSPECT'].includes(v)?'bad':''}async function api(u,o){let r=await fetch(u,o),d=await r.json();if(!r.ok)throw Error(JSON.stringify(d.detail));return d}async function status(){try{let s=await api('/api/status');$('serverBadge').textContent=s.models_ready&&s.demo_ready?'● System Ready':'● Setup Required';$('serverBadge').className='badge '+(s.models_ready&&s.demo_ready?'live':'err');if(s.operating_states?.length)$('operating').innerHTML=s.operating_states.map(x=>`<option>${x}</option>`).join('');if(!s.models_ready||!s.demo_ready){$('setupNotice').classList.remove('hidden');$('setupNotice').textContent='Train models first: python scripts/train_models.py --data-dir "C:\\path\\to\\FINAL_DATASET"'}}catch(e){$('serverBadge').textContent='● Backend Offline';$('serverBadge').className='badge err'}}function risk(r){let n={engine_condition:'Engine condition',digital_twin_deviation:'Twin deviation',mission_stress:'Mission stress',fault_evidence:'Fault evidence',sensor_uncertainty:'Sensor uncertainty'};$('riskBreakdown').innerHTML=Object.entries(r.components).map(([k,v])=>`<div class="riskrow"><span>${n[k]}</span><div class="bar"><i style="width:${Math.min(100,v)}%"></i></div><b>${fmt(v,0)}</b></div>`).join('')}function render(r){$('health').textContent=r.health_state;$('health').className='kpi '+cls(r.health_state);$('healthSub').textContent=`ML class ${r.ml_health_state} • confidence ${(100*r.health_confidence).toFixed(1)}%`;$('healthIndex').textContent=fmt(r.health_index,1);$('missionRisk').textContent=`${r.mission_risk.level} ${fmt(r.mission_risk.score,0)}`;$('missionRisk').className='kpi '+cls(r.mission_risk.level);$('reliability').textContent=`reliability index ${fmt(r.mission_risk.mission_reliability_index,1)}`;$('residual').textContent=fmt(r.twin.residual_rms,2);$('anomaly').textContent=`anomaly ${r.anomaly_flag?'DETECTED':'not detected'} • ${fmt(r.anomaly_score,3)}`;$('advice').textContent=r.maintenance_advisory;$('faults').innerHTML=r.fault_candidates.map(x=>`<div class="diag"><b>${x.name} • ${x.severity}</b><div class="evidence">${x.evidence.join(' • ')}</div></div>`).join('');let sh=r.sensor_health;$('sensorSummary').innerHTML=`Overall <b class="${cls(sh.overall_status)}">${fmt(sh.overall_trust_score,0)} • ${sh.overall_status}</b>`;$('sensorTable').innerHTML=sh.channels.map(x=>`<tr><td>${x.name}</td><td class="${cls(x.status)}">${fmt(x.trust_score,0)} • ${x.status}</td></tr>`).join('');$('deviationTable').innerHTML=r.twin.dominant_deviations.map(x=>`<tr><td>${x.parameter}</td><td>${fmt(x.z_score,2)}</td><td>${fmt(x.percentage_deviation,1)}%</td></tr>`).join('');$('telemetry').innerHTML=Object.entries(r.telemetry).map(([k,v])=>`<tr><td>${k}</td><td>${fmt(v,2)}</td></tr>`).join('');$('compare').innerHTML=Object.keys(r.twin.expected).map(k=>`<tr><td>${k}</td><td>${fmt(r.twin.expected[k],2)}</td><td>${fmt(+r.telemetry[k],2)}</td><td>${fmt(r.twin.z_scores[k],2)}</td></tr>`).join('');risk(r.mission_risk)}async function analyzeSnapshot(){try{render(await api('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(scenario())}))}catch(e){alert(e.message)}}function chart(a){let c=$('timeline'),x=c.getContext('2d'),W=c.width,H=c.height,p=38;x.clearRect(0,0,W,H);x.fillStyle='#081424';x.fillRect(0,0,W,H);for(let s of [['health_index','#5ce59a'],['risk_score','#ff7070']]){x.beginPath();a.forEach((q,i)=>{let X=p+(W-2*p)*i/Math.max(1,a.length-1),Y=H-p-(H-2*p)*(q[s[0]]/100);i?x.lineTo(X,Y):x.moveTo(X,Y)});x.strokeStyle=s[1];x.lineWidth=2.5;x.stroke()}}async function runReplay(){try{let r=await api('/api/replay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(scenario({steps:48,step_minutes:5,fault_onset_ratio:+$('onset').value}))});chart(r.timeline);let s=r.summary,q=s.rul_method_demonstrator;$('rul').textContent=q.rul_hours==null?'Stable':fmt(q.rul_hours,1)+' h';$('rulSub').textContent=q.status+' • method demo';$('events').innerHTML=`<div class="event"><strong>Fault onset</strong>${s.fault_onset_min??'none'} min</div><div class="event"><strong>Hybrid intelligent warning</strong>${s.intelligent_warning_min??'none'} min</div><div class="event"><strong>3σ reference</strong>${s.reference_alarm_min??'none'} min</div><div class="event"><strong>Timing difference</strong>${s.early_warning_gain_min??'n/a'} min</div>`}catch(e){alert(e.message)}}let ws=null;function startLiveStream(){if(ws)ws.close();let proto=location.protocol==='https:'?'wss':'ws';ws=new WebSocket(`${proto}://${location.host}/ws/telemetry`);let a=[];ws.onopen=()=>ws.send(JSON.stringify(scenario({steps:48,step_minutes:5,fault_onset_ratio:+$('onset').value,playback_interval_s:.18})));ws.onmessage=e=>{let m=JSON.parse(e.data);if(m.type==='telemetry'){a.push(m.data);chart(a);$('health').textContent=m.data.health_state;$('healthIndex').textContent=fmt(m.data.health_index,1);$('missionRisk').textContent=`${m.data.risk_level} ${fmt(m.data.risk_score,0)}`;$('residual').textContent=fmt(m.data.residual_rms,2);$('anomaly').textContent=`streaming • t=${m.data.time_min} min • ${m.data.primary_fault}`}else if(m.type==='summary')$('events').innerHTML+=`<div class="event"><strong>Live complete</strong>Peak risk ${m.data.peak_risk_score}</div>`}}async function loadMetrics(){try{let m=await api('/api/metrics');$('metricsCard').classList.remove('hidden');$('metrics').innerHTML=Object.entries(m).map(([k,x])=>`<div class="diag"><b>${k}</b><div class="evidence">Accuracy ${x.accuracy==null?'—':(100*x.accuracy).toFixed(1)+'%'} • Balanced ${x.balanced_accuracy==null?'—':(100*x.balanced_accuracy).toFixed(1)+'%'} ${x.split_strategy||x.role||''}</div></div>`).join('')}catch(e){alert(e.message)}}status();analyzeSnapshot();</script></body></html>
+function startLiveStream(){
+    if(ws) ws.close();
+
+    let proto = location.protocol === 'https:' ? 'wss' : 'ws';ss
+
+    ws = new WebSocket(
+        `${proto}://${location.host}/ws/telemetry`
+    );
+
+    let a = [];
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify(
+            scenario({
+                steps: 48,
+                step_minutes: 5,
+                fault_onset_ratio: +$('onset').value,
+                playback_interval_s: .18
+            })
+        ));
+    };
+
+    ws.onmessage = e => {
+        let m = JSON.parse(e.data);
+
+        if(m.type === 'telemetry'){
+
+            a.push(m.data);
+            chart(a);
+
+            const liveTelemetry =
+                m.data.telemetry || {};
+
+            /*
+             * Store the actual simulated UAV telemetry.
+             * Phase-6 dashboard code will prefer this over
+             * the previous /api/analyze snapshot.
+             */
+            window.__aeropulseLiveState = {
+                telemetry: liveTelemetry,
+                time_min: m.data.time_min,
+                health_state: m.data.health_state,
+                health_index: m.data.health_index,
+                risk_score: m.data.risk_score,
+                risk_level: m.data.risk_level,
+                residual_rms: m.data.residual_rms,
+                primary_fault: m.data.primary_fault,
+                degradation_severity:
+                    m.data.degradation_severity
+            };
+
+            /*
+             * Update live KPI cards.
+             */
+            $('health').textContent =
+                m.data.health_state;
+
+            $('healthIndex').textContent =
+                fmt(m.data.health_index, 1);
+
+            $('missionRisk').textContent =
+                `${m.data.risk_level} ${fmt(m.data.risk_score,0)}`;
+
+            $('residual').textContent =
+                fmt(m.data.residual_rms, 2);
+
+            $('anomaly').textContent =
+                `streaming • t=${m.data.time_min} min • ${m.data.primary_fault}`;
+
+            /*
+             * Update the Observed Telemetry table
+             * from the LIVE simulated UAV.
+             */
+            $('telemetry').innerHTML =
+                Object.entries(liveTelemetry)
+                    .map(([k,v]) =>
+                        `<tr>
+                            <td>${k}</td>
+                            <td>${fmt(v,2)}</td>
+                        </tr>`
+                    )
+                    .join('');
+
+            /*
+             * Make the selected simulated fault visible.
+             * Do not allow the old snapshot diagnosis to
+             * overwrite the live fault.
+             */
+            const selectedFault =
+                $('fault').value;
+
+            const faultNames = {
+                none: 'Healthy / no injected fault',
+                overheating: 'Overheating / thermal abnormality',
+                lubrication: 'Lubrication degradation',
+                misfire: 'Misfire-like abnormality',
+                injector: 'Fuel/injector abnormality',
+                sensor_drift: 'Sensor drift',
+                electrical: 'Battery / alternator abnormality'
+            };
+
+            if(selectedFault !== 'none'){
+                $('faults').innerHTML =
+                    `<div class="diag">
+                        <b>${faultNames[selectedFault] || selectedFault}</b>
+                        <div class="evidence">
+                            simulated fault • severity ${fmt(+$('severity').value,2)}
+                            • onset ${fmt(+$('onset').value * 100,0)}%
+                        </div>
+                    </div>`;
+
+                $('advice').textContent =
+                    `Increase monitoring and schedule targeted inspection: ${faultNames[selectedFault] || selectedFault}.`;
+            }
+
+        } else if(m.type === 'summary') {
+
+            $('events').innerHTML +=
+                `<div class="event">
+                    <strong>Live complete</strong>
+                    Peak risk ${m.data.peak_risk_score}
+                </div>`;
+
+            /*
+             * Keep live state available until the next
+             * snapshot or live stream.
+             */
+        }
+    };
+
+    ws.onclose = () => {
+        if($('anomaly')){
+            $('anomaly').textContent =
+                'live stream disconnected';
+        }
+    };
+
+    ws.onerror = () => {
+        if($('anomaly')){
+            $('anomaly').textContent =
+                'live stream error';
+        }
+    };
+}
