@@ -24,3 +24,9 @@ data/raw/
 .env
 .DS_Store
 Thumbs.db
+# Allow compressed final dataset for repository distribution
+!FINAL_DATASET/
+FINAL_DATASET/*
+!FINAL_DATASET/ACES/
+FINAL_DATASET/ACES/*
+!FINAL_DATASET/ACES/aces_health.zip
