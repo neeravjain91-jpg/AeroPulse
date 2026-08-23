@@ -1,8 +1,4 @@
-"""Remaining Useful Life (RUL) and Prognostics Analytics Service for Aero Piston Engines.
-
-This module provides physics-informed degradation modeling, Weibull hazard rate
-analysis, and health-horizon extrapolation for MALE UAV propulsion systems.
-"""
+"""Remaining Useful Life (RUL) and Prognostics Analytics Service for Aero Piston Engines."""
 from __future__ import annotations
 
 import math
@@ -33,17 +29,13 @@ class RULService:
 
     CRITICAL_HEALTH_THRESHOLD: float = 35.0
     WARNING_HEALTH_THRESHOLD: float = 60.0
-    NOMINAL_TBO_HOURS: float = 2000.0  # Typical Aero Piston Engine Time Between Overhauls
+    NOMINAL_TBO_HOURS: float = 2000.0
 
     def __init__(self):
-        # Weibull distribution shape parameter (beta > 1 implies wear-out phase)
         self.weibull_beta: float = 2.4
-        self.weibull_eta: float = 2200.0  # Characteristic life in flight hours
+        self.weibull_eta: float = 2200.0
 
     def calculate_mission_stress(self, context: Optional[dict] = None) -> float:
-        """
-        Calculates cumulative mission stress multiplier based on environmental and operating factors.
-        """
         if not context:
             return 1.0
 
@@ -53,16 +45,9 @@ class RULService:
         rapid_throttle = bool(context.get("rapid_throttle", False))
         throttle = float(context.get("throttle", 0.60))
 
-        # Altitude stress (high altitude thins cooling air and increases turbocharger pressure ratio)
         alt_stress = 1.0 + 0.35 * max(0.0, (altitude_ft - 10000.0) / 15000.0)
-
-        # Thermal stress (high ambient temperature accelerates oil breakdown and thermal fatigue)
         thermal_stress = 1.0 + 0.40 * max(0.0, (ambient_c - 25.0) / 25.0)
-
-        # Endurance duration stress (continuous high-temperature steady state)
         endurance_stress = 1.0 + 0.20 * max(0.0, (duration_h - 6.0) / 12.0)
-
-        # Dynamic throttle cycling stress (fatigue due to pressure & thermal transients)
         dynamic_stress = 1.35 if rapid_throttle else (1.0 + 0.15 * max(0.0, (throttle - 0.70) / 0.30))
 
         cumulative_stress = alt_stress * thermal_stress * endurance_stress * dynamic_stress
@@ -75,13 +60,9 @@ class RULService:
         context: Optional[dict] = None,
         step_minutes: float = 5.0,
     ) -> dict[str, Any]:
-        """
-        Estimates Remaining Useful Life (RUL) with confidence bounds.
-        """
         current_health = max(0.0, min(100.0, float(health_index)))
         stress = self.calculate_mission_stress(context)
 
-        # If substantial history is available, use trend extrapolation
         if health_history and len(health_history) >= 6:
             trend_res = estimate_degradation_horizon(
                 health_history,
@@ -91,7 +72,6 @@ class RULService:
 
             if trend_res.get("rul_hours") is not None and trend_res.get("status") == "DEGRADING":
                 base_rul = float(trend_res["rul_hours"])
-                # Adjust RUL by current mission stress
                 adjusted_rul = max(0.5, base_rul / math.sqrt(stress))
                 confidence = float(trend_res.get("confidence", 0.75))
                 spread = (1.0 - confidence) * 0.35
@@ -109,8 +89,6 @@ class RULService:
                     "method": "Physics-Stress Weighted Trend Extrapolation",
                 }
 
-        # Physics & Weibull baseline estimation when limited dynamic history is present
-        # Nominal baseline degradation rate = 0.045 health points per normal flight hour
         nominal_deg_rate = 0.045 * stress
 
         if current_health <= self.CRITICAL_HEALTH_THRESHOLD:
@@ -130,7 +108,6 @@ class RULService:
         else:
             remaining_points = current_health - self.CRITICAL_HEALTH_THRESHOLD
             rul_h = remaining_points / max(nominal_deg_rate, 0.02)
-            # Cap at realistic TBO window
             rul_h = min(self.NOMINAL_TBO_HOURS, rul_h)
             confidence = 0.70
             spread = 0.30
@@ -158,15 +135,40 @@ class RULService:
         health_history: Optional[List[float]] = None,
     ) -> dict[str, Any]:
         """Inference interface for live pipeline."""
-        # Estimate approximate health from telemetry if not directly provided
-        base_health = 100.0
-        if "Degradation_Severity" in telemetry:
-            base_health -= float(telemetry["Degradation_Severity"]) * 45.0
-        return self.estimate_rul(
+        context = context or {}
+        deg_sev = float(telemetry.get("Degradation_Severity", 0.0))
+        base_health = max(10.0, 100.0 - deg_sev * 60.0)
+
+        slope = context.get("degradation_slope")
+        if slope is not None:
+            slope_val = float(slope)
+            remaining = base_health - self.CRITICAL_HEALTH_THRESHOLD
+            divisor = abs(slope_val * 60.0) if abs(slope_val) < 0.2 else abs(slope_val)
+            rul_val = max(0.0, remaining / max(0.01, divisor))
+            return {
+                "rul_hours": round(rul_val, 2),
+                "rul_lower_hours": max(0.0, round(rul_val * 0.75, 2)),
+                "rul_upper_hours": round(rul_val * 1.25, 2),
+                "confidence": 0.85,
+                "rul_confidence": 0.85,
+                "health_index_for_rul": round(base_health, 1),
+                "degradation_slope": slope_val,
+                "degradation_severity": round(deg_sev, 3),
+                "status": "SLOPE_EXTRAPOLATED",
+                "failure_mode_risk": self._diagnose_risk_tier(base_health),
+                "stress_multiplier": 1.0,
+                "method": "Explicit Slope Estimation",
+            }
+
+        res = self.estimate_rul(
             health_index=base_health,
             health_history=health_history,
             context=context,
         )
+        res["health_index_for_rul"] = round(base_health, 1)
+        res["degradation_severity"] = round(deg_sev, 3)
+        res["degradation_slope"] = round(-res.get("degradation_rate_per_hour", 0.05) / 60.0, 4)
+        return res
 
     @staticmethod
     def _diagnose_risk_tier(health: float) -> str:

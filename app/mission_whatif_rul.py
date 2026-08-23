@@ -1,6 +1,7 @@
 """What-If Mission Scenario and Comparative RUL Impact Engine."""
 from __future__ import annotations
 
+import copy
 import math
 from typing import Any, Dict, Optional
 
@@ -28,6 +29,34 @@ class MissionWhatIfRUL:
         self.engine = ReducedOrderPistonEngine()
         self.rul_service = RULService()
 
+    def run(self, telemetry: dict, scenario: MissionScenario) -> dict[str, Any]:
+        """Runs a single scenario simulation with degradation kinetics and RUL."""
+        sim_telemetry = mission_adjust(
+            telemetry,
+            altitude_ft=scenario.altitude_ft,
+            ambient_c=scenario.ambient_c,
+            duration_h=scenario.duration_h,
+            rapid_throttle=scenario.rapid_throttle,
+            degradation_rates=self.weights,
+        )
+        deg_sev = float(sim_telemetry.get("Degradation_Severity", 0.0))
+        health_index = max(10.0, min(100.0, 100.0 - deg_sev * 60.0))
+        rul_res = self.rul_service.predict(sim_telemetry, scenario.to_dict())
+        cht = float(sim_telemetry.get("CHT", 145.0))
+        fuel_flow = float(sim_telemetry.get("Fuel_Flow", 30.0))
+        total_fuel = round(fuel_flow * scenario.duration_h, 2)
+
+        return {
+            "scenario": scenario.name,
+            "telemetry": sim_telemetry,
+            "cht": round(cht, 1),
+            "fuel_flow": round(fuel_flow, 2),
+            "total_fuel_burn_l": total_fuel,
+            "degradation_severity": round(deg_sev, 3),
+            "health_index": round(health_index, 1),
+            "rul": rul_res,
+        }
+
     def evaluate_scenario(self, base_telemetry: dict, scenario: MissionScenario) -> dict[str, Any]:
         """Evaluates engine response and projected health/RUL under a single mission scenario."""
         sim_telemetry = mission_adjust(
@@ -40,7 +69,6 @@ class MissionWhatIfRUL:
 
         stress = self.rul_service.calculate_mission_stress(scenario.to_dict())
 
-        # Physical engine state from thermodynamic model
         eng_inputs = EngineInputs(
             rpm=float(sim_telemetry.get("Engine_RPM", 3000.0)),
             throttle=0.75 if scenario.rapid_throttle else 0.60,
@@ -49,7 +77,6 @@ class MissionWhatIfRUL:
         )
         phys_state = self.engine.estimate_state(eng_inputs)
 
-        # Thermal stress factor
         cht = float(sim_telemetry.get("CHT", 220.0))
         oil_temp = float(sim_telemetry.get("Oil_Temp", 90.0))
         egt_avg = (
@@ -59,11 +86,8 @@ class MissionWhatIfRUL:
         ) / 3.0
 
         thermal_severity = max(0.0, (cht - 210.0) / 100.0) + max(0.0, (oil_temp - 95.0) / 30.0)
-
-        # Health degradation rate (% per hour)
         base_health_loss_per_h = (0.045 + 0.03 * thermal_severity) * stress
         cumulative_mission_health_loss = base_health_loss_per_h * scenario.duration_h
-
         projected_health_end_of_mission = max(20.0, 100.0 - cumulative_mission_health_loss)
 
         rul_res = self.rul_service.estimate_rul(
@@ -99,45 +123,40 @@ class MissionWhatIfRUL:
 
     def compare(
         self,
-        base_telemetry: dict,
-        baseline_scenario: MissionScenario,
-        alternative_scenario: MissionScenario,
+        telemetry: dict,
+        baseline: MissionScenario,
+        alternative: MissionScenario,
     ) -> dict[str, Any]:
-        """Compares baseline vs alternative mission profile."""
-        base_eval = self.evaluate_scenario(base_telemetry, baseline_scenario)
-        alt_eval = self.evaluate_scenario(base_telemetry, alternative_scenario)
+        """Compares baseline vs alternative mission scenarios."""
+        base_res = self.run(telemetry, baseline)
+        alt_res = self.run(telemetry, alternative)
 
-        rul_delta = (alt_eval["rul_hours"] or 0.0) - (base_eval["rul_hours"] or 0.0)
-        fuel_delta = alt_eval["total_fuel_burn_l"] - base_eval["total_fuel_burn_l"]
-        fuel_pct = (
-            (fuel_delta / max(base_eval["total_fuel_burn_l"], 1e-6)) * 100.0
-            if base_eval["total_fuel_burn_l"] > 0
-            else 0.0
-        )
-        stress_delta = alt_eval["stress_multiplier"] - base_eval["stress_multiplier"]
+        rul_delta = round(alt_res["rul"]["rul_hours"] - base_res["rul"]["rul_hours"], 2)
+        health_delta = round(alt_res["health_index"] - base_res["health_index"], 2)
 
-        if rul_delta >= 0:
-            recommendation = (
-                f"Alternative profile extends projected engine RUL by +{rul_delta:.1f} hours "
-                f"(Fuel delta: {fuel_delta:+.1f} L / {fuel_pct:+.1f}%)."
-            )
-            risk_assessment = "FAVORABLE_OR_CONSERVATIVE"
-        else:
-            recommendation = (
-                f"Alternative profile incurs elevated stress, reducing projected RUL by {abs(rul_delta):.1f} hours "
-                f"(Fuel delta: {fuel_delta:+.1f} L / {fuel_pct:+.1f}%)."
-            )
-            risk_assessment = "ELEVATED_THERMOMECHANICAL_PENALTY"
+        impact = {
+            "rul_hours": rul_delta,
+            "health_index": health_delta,
+            "degradation_severity": round(alt_res["degradation_severity"] - base_res["degradation_severity"], 3),
+            "fuel_flow": round(alt_res["fuel_flow"] - base_res["fuel_flow"], 2),
+            "cht": round(alt_res["cht"] - base_res["cht"], 1),
+        }
+
+        base_eval = self.evaluate_scenario(telemetry, baseline)
+        alt_eval = self.evaluate_scenario(telemetry, alternative)
+        fuel_diff = round(alt_eval["total_fuel_burn_l"] - base_eval["total_fuel_burn_l"], 1)
+        fuel_pct = round(100.0 * fuel_diff / max(1.0, base_eval["total_fuel_burn_l"]), 2)
 
         return {
-            "baseline": base_eval,
-            "alternative": alt_eval,
+            "baseline": base_res,
+            "alternative": alt_res,
+            "impact": impact,
             "comparison": {
-                "rul_delta_hours": round(rul_delta, 2),
-                "fuel_delta_liters": round(fuel_delta, 2),
-                "fuel_delta_percent": round(fuel_pct, 2),
-                "stress_multiplier_delta": round(stress_delta, 3),
-                "recommendation": recommendation,
-                "risk_assessment": risk_assessment,
+                "rul_delta_hours": rul_delta,
+                "fuel_delta_liters": fuel_diff,
+                "fuel_delta_percent": fuel_pct,
+                "stress_multiplier_delta": round(alt_eval["stress_multiplier"] - base_eval["stress_multiplier"], 3),
+                "risk_assessment": "ELEVATED_THERMOMECHANICAL_PENALTY" if rul_delta < 0 else "NOMINAL_OPTIMAL",
+                "recommendation": f"Alternative profile results in RUL delta of {rul_delta}h (Fuel delta: {fuel_diff} L).",
             },
         }
