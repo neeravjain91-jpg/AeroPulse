@@ -1,0 +1,162 @@
+{
+  "aces_health": {
+    "accuracy": 0.8721266757592895,
+    "balanced_accuracy": 0.8037181714164683,
+    "split_strategy": "held-out flights (GroupShuffleSplit, 20% test)",
+    "held_out_flights": [
+      "aces1am_2002_191",
+      "aces1am_2002_225",
+      "aces1am_2002_235"
+    ],
+    "features": [
+      "Engine_RPM",
+      "EGT1",
+      "EGT2",
+      "EGT3",
+      "CHT",
+      "Fuel_Flow",
+      "Oil_Temp",
+      "Oil_Pressure",
+      "Battery_Voltage",
+      "Battery_Current",
+      "Alternator_Temp",
+      "EFI_Fuel_Temp",
+      "EFI_Water_Temp",
+      "MAP_Injector",
+      "Operating_State"
+    ],
+    "report": {
+      "Critical": {
+        "precision": 0.7441520467836257,
+        "recall": 0.7496318114874816,
+        "f1-score": 0.7468818782098312,
+        "support": 679.0
+      },
+      "Normal": {
+        "precision": 0.9010805897798425,
+        "recall": 0.9589961306964746,
+        "f1-score": 0.9291367281058003,
+        "support": 18608.0
+      },
+      "Warning": {
+        "precision": 0.8607050730868444,
+        "recall": 0.825,
+        "f1-score": 0.8424744003366531,
+        "support": 3640.0
+      },
+      "Watch": {
+        "precision": 0.7988165680473372,
+        "recall": 0.6812447434819175,
+        "f1-score": 0.7353608715388107,
+        "support": 7134.0
+      },
+      "accuracy": 0.8721266757592895,
+      "macro avg": {
+        "precision": 0.8261885694244124,
+        "recall": 0.8037181714164683,
+        "f1-score": 0.8134634695477738,
+        "support": 30061.0
+      },
+      "weighted avg": {
+        "precision": 0.8683779886522475,
+        "recall": 0.8721266757592895,
+        "f1-score": 0.8685399789321879,
+        "support": 30061.0
+      }
+    }
+  },
+  "marine_fault_research": {
+    "accuracy": 0.0014178482068390324,
+    "balanced_accuracy": 0.0013093037584719655,
+    "role": "supporting cross-domain fault-signature research; not deployed as MALE-UAV diagnosis",
+    "report": {
+      "AC_Fouling": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 5801.0
+      },
+      "AF_Clogging": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 6398.0
+      },
+      "Injector_Nozzle": {
+        "precision": 1.0,
+        "recall": 0.005237215033887862,
+        "f1-score": 0.010419859025436715,
+        "support": 6492.0
+      },
+      "Pump_Cavitation": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "Turbine_Degradation": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 5289.0
+      },
+      "accuracy": 0.0014178482068390324,
+      "macro avg": {
+        "precision": 0.2,
+        "recall": 0.0010474430067775723,
+        "f1-score": 0.002083971805087343,
+        "support": 23980.0
+      },
+      "weighted avg": {
+        "precision": 0.2707256046705588,
+        "recall": 0.0014178482068390324,
+        "f1-score": 0.0028209226352433345,
+        "support": 23980.0
+      }
+    }
+  },
+  "cwru_vibration": {
+    "accuracy": 0.6903225806451613,
+    "balanced_accuracy": 0.618421052631579,
+    "role": "supporting vibration/bearing-condition research; not target-engine validation",
+    "report": {
+      "Ball": {
+        "precision": 1.0,
+        "recall": 0.47368421052631576,
+        "f1-score": 0.6428571428571429,
+        "support": 19.0
+      },
+      "Inner_Race": {
+        "precision": 0.3333333333333333,
+        "recall": 1.0,
+        "f1-score": 0.5,
+        "support": 19.0
+      },
+      "Normal": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 79.0
+      },
+      "Outer_Race": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 38.0
+      },
+      "accuracy": 0.6903225806451613,
+      "macro avg": {
+        "precision": 0.5833333333333333,
+        "recall": 0.618421052631579,
+        "f1-score": 0.5357142857142857,
+        "support": 155.0
+      },
+      "weighted avg": {
+        "precision": 0.6731182795698925,
+        "recall": 0.6903225806451613,
+        "f1-score": 0.6497695852534563,
+        "support": 155.0
+      }
+    }
+  }
+}

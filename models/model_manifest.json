@@ -1,0 +1,50 @@
+{
+  "project": "AeroPulse-X",
+  "model_version": "1.0.0-sih",
+  "python": "3.11.9",
+  "scikit_learn": "1.8.0",
+  "aces": {
+    "role": "primary UAV operational/health dataset",
+    "features": [
+      "Engine_RPM",
+      "EGT1",
+      "EGT2",
+      "EGT3",
+      "CHT",
+      "Fuel_Flow",
+      "Oil_Temp",
+      "Oil_Pressure",
+      "Battery_Voltage",
+      "Battery_Current",
+      "Alternator_Temp",
+      "EFI_Fuel_Temp",
+      "EFI_Water_Temp",
+      "MAP_Injector",
+      "Operating_State"
+    ],
+    "target": "Health_State",
+    "leakage_exclusions": [
+      "Robust_Anomaly_Score",
+      "Robust_Max_Deviation",
+      "Sensors_Above_2Sigma",
+      "Sensors_Above_3Sigma",
+      "*_rz derived robust-z features"
+    ],
+    "split_strategy": "held-out flights (GroupShuffleSplit, 20% test)",
+    "held_out_flights": [
+      "aces1am_2002_191",
+      "aces1am_2002_225",
+      "aces1am_2002_235"
+    ]
+  },
+  "marine": {
+    "role": "supporting fault-signature research only"
+  },
+  "cwru": {
+    "role": "supporting vibration/bearing research only"
+  },
+  "rul": {
+    "runtime_status": "method demonstrator from mission trend",
+    "validation_gap": "target-domain run-to-failure trajectories are not available in the supplied datasets"
+  }
+}
