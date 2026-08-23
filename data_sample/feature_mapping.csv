@@ -1,0 +1,11 @@
+Common_Feature,ACES_Feature,Marine_Feature,Description
+Engine_RPM,Engine_RPM,Engine Speed,Engine rotational speed
+EGT1,EGT1,No.1 Exh.Gas Temp.,Exhaust gas temperature
+EGT2,EGT2,No.2 Exh.Gas Temp.,Exhaust gas temperature
+EGT3,EGT3,No.3 Exh.Gas Temp.,Exhaust gas temperature
+Fuel_Flow,Fuel_Flow,Fuel Flow,Fuel flow
+Oil_Temp,Oil_Temp,LO Temp. Engine Out,Lubricating-oil temperature
+Oil_Pressure,Oil_Pressure,LO Circulating Pump Press.,Lubricating-oil pressure
+EFI_Fuel_Temp,EFI_Fuel_Temp,Fuel Temp.,Fuel temperature
+EFI_Water_Temp,EFI_Water_Temp,Cooling Water Temp. Engine Out I,Cooling-water temperature
+MAP_Injector,MAP_Injector,Charge Air Press.,Charge-air pressure

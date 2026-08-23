@@ -1,0 +1,16 @@
+Dataset,Label_Column,Label,Meaning
+ACES,Health_State,Normal,Normal operating condition
+ACES,Health_State,Watch,Early health deviation
+ACES,Health_State,Warning,Significant health deviation
+ACES,Health_State,Critical,Severe health deviation
+Marine,Anomaly_State,0,Pre-anomaly / non-anomalous state
+Marine,Anomaly_State,1,Anomalous state
+Marine,Fault_Type,AC_Fouling,Air-cooler fouling
+Marine,Fault_Type,AF_Clogging,Air-filter clogging
+Marine,Fault_Type,Injector_Nozzle,Injection-valve nozzle clogging
+Marine,Fault_Type,Pump_Cavitation,Cooling-water pump cavitation
+Marine,Fault_Type,Turbine_Degradation,Turbine degradation
+CWRU,Fault,Normal,Normal bearing condition
+CWRU,Fault,Ball,Ball fault
+CWRU,Fault,Inner_Race,Inner-race fault
+CWRU,Fault,Outer_Race,Outer-race fault

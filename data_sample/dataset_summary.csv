@@ -1,0 +1,4 @@
+Dataset,File,Rows,Columns,Target,Missing_Values,Infinite_Values
+ACES,aces_model.csv,173878,13,Health_State,0,0
+Marine,marine_full_features.csv,89468,70,Fault_Type,0,0
+CWRU,cwru_features.csv,485,19,Fault,824,0

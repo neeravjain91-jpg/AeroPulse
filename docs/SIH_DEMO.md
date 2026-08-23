@@ -1,18 +1,61 @@
 # Recommended SIH Live Demo
 
-## 1 — Healthy mission
-Select CRUISE, no fault, moderate conditions. Show high health, trusted sensors, low mission risk and small twin residuals.
+## Demo 1 — Healthy mission
 
-## 2 — Lubrication degradation
-Select lubrication at severity ~0.7–0.8 and run Mission Replay. Show oil pressure falling, oil temperature rising, twin deviation, fault evidence, health/risk timeline, maintenance advisory and the clearly labelled RUL method demonstrator.
+1. Select `CRUISE`, no fault.
+2. Run snapshot at a moderate altitude/temperature.
+3. Show:
+   - Normal/healthy state
+   - high sensor trust
+   - low mission risk
+   - small expected-vs-observed residuals
 
-## 3 — Sensor drift
-Inject sensor drift and show the sensor-trust module flagging an isolated temperature inconsistency. Message: AeroPulse-X tries to distinguish instrumentation problems from corroborated engine degradation.
+Message: **the twin understands normal engine behaviour in mission context.**
 
-## 4 — Mission awareness
-Keep the engine/fault state fixed and compare normal conditions with high-altitude, hot-weather, endurance conditions. Show the explainable mission-risk breakdown changing.
+## Demo 2 — Lubrication degradation
 
-## Judge-ready line
-> Instead of waiting for a parameter to cross a limit, AeroPulse-X builds a synchronized expected engine state, measures deviation, combines AI with cross-sensor evidence, tracks degradation, replays mission behaviour and converts engine condition into explainable maintenance and mission-risk decision support.
+1. Select `lubrication` at severity ~0.7–0.8.
+2. Run Mission Replay.
+3. Show:
+   - oil pressure trending down
+   - oil temperature trending up
+   - Digital Twin residual increasing
+   - fault evidence: lubrication degradation
+   - health/risk timeline
+   - maintenance advisory
+   - RUL method demonstrator if the trend is sufficiently degrading
 
-Avoid claims of certified DRDO-grade accuracy, real MALE telemetry, or operational RUL unless you actually have target-domain validation.
+Message: **we detect a developing pattern, not only a single hard threshold.**
+
+## Demo 3 — Sensor drift
+
+1. Select `sensor_drift`.
+2. Run snapshot/replay.
+3. Show the sensor-trust module flagging inconsistent water-temperature behaviour.
+
+Message: **AeroPulse-X tries to distinguish instrumentation issues from real engine degradation.**
+
+## Demo 4 — Mission awareness
+
+Keep engine/fault settings fixed, then compare:
+
+- low-altitude / normal-temperature / short mission
+- high-altitude / hot-weather / endurance mission
+
+Show the mission-risk breakdown changing.
+
+Message: **the same engine health does not imply the same mission risk under every operating condition.**
+
+## Judge-ready one-line explanation
+
+> “Instead of waiting for a parameter to cross a limit, AeroPulse-X builds a synchronized expected engine state, measures deviation, combines AI with cross-sensor evidence, tracks degradation, replays mission behaviour and converts engine condition into explainable maintenance and mission-risk decision support.”
+
+## Claims to avoid
+
+Do not say:
+
+- “99% accurate real UAV failure prediction”
+- “DRDO-grade certified engine model”
+- “real MALE UAV telemetry” unless you actually have it
+- “CWRU/Marine proves our UAV engine faults”
+- “our RUL is operationally validated”
