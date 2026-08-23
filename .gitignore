@@ -9,13 +9,7 @@ venv/
 node_modules/
 dist/
 
-# Generated model/data artifacts
-models/*.joblib
-models/metrics.json
-models/model_manifest.json
-models/cmapss_rul_metrics.json
-data_sample/aces_demo.csv
-data_sample/cwru_demo.csv
+# Raw dataset files
 FINAL_DATASET/
 data/raw/
 *.zip
@@ -27,7 +21,7 @@ Thumbs.db
 *.backup*
 *.backup
 
-# Allow compressed final dataset for repository distribution
+# Allow compressed final dataset package for repository distribution
 !FINAL_DATASET/
 FINAL_DATASET/*
 !FINAL_DATASET/ACES/

@@ -61,6 +61,18 @@ def _load_assets() -> None:
     global _vibration_ai
     global _vibration_demo
 
+    health_model_file = MODEL_DIR / "aces_health.joblib"
+    anomaly_model_file = MODEL_DIR / "aces_anomaly.joblib"
+    healthy_ref_file = MODEL_DIR / "healthy_reference.json"
+    demo_file = DATA_SAMPLE_DIR / "aces_demo.csv"
+
+    if not (health_model_file.exists() and anomaly_model_file.exists() and healthy_ref_file.exists() and demo_file.exists()):
+        try:
+            from scripts.train_models import train_all
+            train_all()
+        except Exception as e:
+            print(f"Auto-train note: {e}")
+
     try:
         _ai = AeroTwinAI()
         _ai_error = None

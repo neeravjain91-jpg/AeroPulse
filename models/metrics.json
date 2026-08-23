@@ -1,0 +1,68 @@
+{
+  "aces_health": {
+    "accuracy": 0.8716276903629288,
+    "balanced_accuracy": 0.805654257101977,
+    "split_strategy": "held-out flights (GroupShuffleSplit, 20% test)",
+    "held_out_flights": [
+      "aces1am_2002_191",
+      "aces1am_2002_225",
+      "aces1am_2002_235"
+    ],
+    "features": [
+      "Engine_RPM",
+      "EGT1",
+      "EGT2",
+      "EGT3",
+      "CHT",
+      "Fuel_Flow",
+      "Oil_Temp",
+      "Oil_Pressure",
+      "Battery_Voltage",
+      "Battery_Current",
+      "Alternator_Temp",
+      "EFI_Fuel_Temp",
+      "EFI_Water_Temp",
+      "MAP_Injector",
+      "Operating_State"
+    ],
+    "report": {
+      "Critical": {
+        "precision": 0.6514215080346106,
+        "recall": 0.7761413843888071,
+        "f1-score": 0.7083333333333334,
+        "support": 679.0
+      },
+      "Normal": {
+        "precision": 0.9070264765784114,
+        "recall": 0.9573301805674979,
+        "f1-score": 0.931499686258105,
+        "support": 18608.0
+      },
+      "Warning": {
+        "precision": 0.8578241430700447,
+        "recall": 0.7906593406593406,
+        "f1-score": 0.8228734810578985,
+        "support": 3640.0
+      },
+      "Watch": {
+        "precision": 0.7963880453891642,
+        "recall": 0.6984861227922624,
+        "f1-score": 0.7442312000597416,
+        "support": 7134.0
+      },
+      "accuracy": 0.8716276903629288,
+      "macro avg": {
+        "precision": 0.8031650432680577,
+        "recall": 0.805654257101977,
+        "f1-score": 0.8017344251772697,
+        "support": 30061.0
+      },
+      "weighted avg": {
+        "precision": 0.8690388236155763,
+        "recall": 0.8716276903629288,
+        "f1-score": 0.868863622218193,
+        "support": 30061.0
+      }
+    }
+  }
+}
