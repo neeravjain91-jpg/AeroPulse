@@ -12,21 +12,64 @@ _DEGRADATION = ContinuousDegradationModel()
 
 
 def inject_fault(telemetry: dict, fault: str = "none", severity: float = 0.6):
-    data = copy.deepcopy(telemetry); fault = str(fault).lower()
-    if fault not in FAULTS: raise ValueError(f"Unsupported fault '{fault}'. Allowed: {sorted(FAULTS)}")
+    """Inject a controlled simulated fault and preserve its provenance."""
+    data = copy.deepcopy(telemetry)
+    fault = str(fault).lower()
+    if fault not in FAULTS:
+        raise ValueError(f"Unsupported fault '{fault}'. Allowed: {sorted(FAULTS)}")
+
     strength = max(0.0, min(1.0, float(severity)))
+
     if fault == "overheating":
-        for key in ["EGT1", "EGT2", "EGT3"]: data[key] *= 1 + 0.30 * strength
-        data["EFI_Water_Temp"] *= 1 + 0.24 * strength; data["Oil_Temp"] *= 1 + 0.18 * strength; data["CHT"] *= 1 + 0.26 * strength
+        for key in ["EGT1", "EGT2", "EGT3"]:
+            data[key] *= 1 + 0.30 * strength
+        data["EFI_Water_Temp"] *= 1 + 0.24 * strength
+        data["Oil_Temp"] *= 1 + 0.18 * strength
+        data["CHT"] *= 1 + 0.26 * strength
     elif fault == "lubrication":
-        data["Oil_Pressure"] *= max(0.25, 1 - 0.65 * strength); data["Oil_Temp"] *= 1 + 0.28 * strength
+        data["Oil_Pressure"] *= max(0.25, 1 - 0.65 * strength)
+        data["Oil_Temp"] *= 1 + 0.28 * strength
     elif fault == "misfire":
-        data["Engine_RPM"] *= 1 - 0.09 * strength; data["EGT1"] *= 1 - 0.25 * strength; data["EGT2"] *= 1 + 0.03 * strength
+        data["Engine_RPM"] *= 1 - 0.09 * strength
+        data["EGT1"] *= 1 - 0.25 * strength
+        data["EGT2"] *= 1 + 0.03 * strength
     elif fault == "injector":
-        data["Fuel_Flow"] *= 1 - 0.32 * strength; data["MAP_Injector"] *= 1 + 0.45 * strength; data["EGT3"] *= 1 - 0.20 * strength
-    elif fault == "sensor_drift": data["EFI_Water_Temp"] += 75 * strength
+        data["Fuel_Flow"] *= 1 - 0.32 * strength
+        data["MAP_Injector"] *= 1 + 0.45 * strength
+        data["EGT3"] *= 1 - 0.20 * strength
+    elif fault == "sensor_drift":
+        data["EFI_Water_Temp"] += 75 * strength
     elif fault == "electrical":
-        data["Battery_Voltage"] *= max(0.55, 1 - 0.30 * strength); data["Battery_Current"] -= 30 * strength; data["Alternator_Temp"] *= 1 + 0.24 * strength
+        data["Battery_Voltage"] *= max(0.55, 1 - 0.30 * strength)
+        data["Battery_Current"] -= 30 * strength
+        data["Alternator_Temp"] *= 1 + 0.24 * strength
+
+    # Preserve fault provenance for the advisory/dashboard layer. These
+    # metadata fields are ignored by the ML feature frames.
+    data["Injected_Fault"] = fault
+    data["Injected_Fault_Severity"] = strength
+
+    degradation = {
+        "injector": 0.0,
+        "lubrication": 0.0,
+        "thermal": 0.0,
+        "mechanical": 0.0,
+        "electrical": 0.0,
+        "sensor": 0.0,
+    }
+    mapping = {
+        "overheating": "thermal",
+        "lubrication": "lubrication",
+        "misfire": "mechanical",
+        "injector": "injector",
+        "sensor_drift": "sensor",
+        "electrical": "electrical",
+    }
+    if fault in mapping:
+        degradation[mapping[fault]] = strength
+    data["Degradation_State"] = degradation
+    data["Degradation_Severity"] = strength
+
     return data
 
 
